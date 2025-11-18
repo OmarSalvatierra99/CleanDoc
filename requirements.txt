@@ -1,3 +1,20 @@
+# CleanDoc - Dependencias
+# ========================
+
+# Framework web
 flask==3.0.3
+
+# Manipulación de archivos DOCX
 python-docx==1.1.2
+
+# Servidor WSGI para producción
 gunicorn==23.0.0
+
+# Parser XML (requerido por python-docx)
+lxml==5.3.0
+
+# Variables de entorno
+python-dotenv==1.0.1
+
+# Utilidades
+werkzeug==3.0.4

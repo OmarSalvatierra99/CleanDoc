@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CleanDoc · Órgano de Fiscalización Superior de Tlaxcala</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/ofs_logo.png') }}">
+</head>
+
+<body>
+  <!-- =======================================================
+       CABECERA
+  ======================================================= -->
+  <header class="header-fixed">
+    <div class="header-content">
+      <img src="{{ url_for('static', filename='img/ofs_logo.png') }}" alt="Logo OFS Tlaxcala" class="ofs-logo">
+      <div class="header-text">
+        <h1>CleanDoc <span class="version">v2.0</span></h1>
+        <p>Sistema de limpieza institucional de documentos Word (.docx)</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- =======================================================
+       CONTENIDO PRINCIPAL
+  ======================================================= -->
+  <main class="main-content">
+    <section class="tool-card">
+      <h2>Limpieza automatizada de cédulas de auditoría</h2>
+      <p>
+        <strong>CleanDoc</strong> es una aplicación desarrollada por el
+        <strong>Órgano de Fiscalización Superior del Estado de Tlaxcala (OFS)</strong>
+        para depurar archivos Word de uso interno, garantizando uniformidad documental.
+      </p>
+
+      <p>El sistema realiza las siguientes operaciones sobre cada archivo <code>.docx</code>:</p>
+      <ul style="text-align:left; font-size:0.95rem; color:#374151; margin:1rem 0;">
+        <li>Elimina <strong>imágenes institucionales</strong> en los encabezados.</li>
+        <li>Borra el texto <em>"DIRECCIÓN DE AUDITORÍA A ENTES ESTATALES"</em> en cualquier formato o posición.</li>
+        <li>Suprime la línea <strong>"Elaboró: Revisó: Autorizó: Vo.Bo."</strong> junto con todo lo que le sigue.</li>
+      </ul>
+
+      <p>El resto del contenido —observaciones, cédulas, cálculos y texto técnico— permanece sin alteraciones.</p>
+
+      <!-- Zona de Drag & Drop -->
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">📁</div>
+        <h3>Arrastra archivos aquí</h3>
+        <p>o haz clic para seleccionar</p>
+        <input type="file" id="fileInput" name="archivo" accept=".docx" multiple hidden>
+        <span class="file-types">Solo archivos .docx (máx. 50 MB)</span>
+      </div>
+
+      <!-- Vista previa de archivos -->
+      <div id="filePreview" class="file-preview hidden">
+        <h3>Archivos seleccionados (<span id="fileCount">0</span>)</h3>
+        <div id="fileList" class="file-list"></div>
+        <button type="button" id="processBtn" class="btn-primary">
+          <span class="btn-icon">🔧</span>
+          Procesar y limpiar
+        </button>
+      </div>
+
+      <!-- Barra de progreso -->
+      <div id="progressContainer" class="progress-container hidden">
+        <div class="progress-header">
+          <span id="progressText">Procesando documentos...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Mensaje de estado -->
+      <div id="statusMessage" class="status-message hidden"></div>
+
+      <!-- Estadísticas de limpieza -->
+      <div id="statsContainer" class="stats-container hidden">
+        <h3>Estadísticas de limpieza</h3>
+        <div class="stats-grid" id="statsGrid"></div>
+      </div>
+
+      <p style="font-size:0.85rem; color:#6b7280; margin-top:1rem;">
+        Los archivos se limpiarán automáticamente y se descargarán de inmediato.<br>
+        Si se cargan varios documentos, CleanDoc generará un archivo comprimido ZIP con todos los resultados.
+      </p>
+    </section>
+  </main>
+
+  <!-- =======================================================
+       PIE DE PÁGINA
+  ======================================================= -->
+  <footer class="dashboard-footer">
+    © Órgano de Fiscalización Superior del Estado de Tlaxcala — Sistema CleanDoc v2.0
+  </footer>
+
+  <!-- =======================================================
+       SCRIPT PRINCIPAL
+  ======================================================= -->
+  <script>
+    // ============================================================
+    // ELEMENTOS DEL DOM
+    // ============================================================
+    const uploadArea = document.getElementById("uploadArea");
+    const fileInput = document.getElementById("fileInput");
+    const filePreview = document.getElementById("filePreview");
+    const fileList = document.getElementById("fileList");
+    const fileCount = document.getElementById("fileCount");
+    const processBtn = document.getElementById("processBtn");
+    const progressContainer = document.getElementById("progressContainer");
+    const progressFill = document.getElementById("progressFill");
+    const progressText = document.getElementById("progressText");
+    const progressPercent = document.getElementById("progressPercent");
+    const statusMessage = document.getElementById("statusMessage");
+    const statsContainer = document.getElementById("statsContainer");
+    const statsGrid = document.getElementById("statsGrid");
+
+    // Estado de la aplicación
+    let selectedFiles = [];
+
+    // ============================================================
+    // DRAG & DROP
+    // ============================================================
+    uploadArea.addEventListener("click", () => fileInput.click());
+
+    uploadArea.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      uploadArea.classList.add("drag-over");
+    });
+
+    uploadArea.addEventListener("dragleave", () => {
+      uploadArea.classList.remove("drag-over");
+    });
+
+    uploadArea.addEventListener("drop", (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove("drag-over");
+
+      const files = Array.from(e.dataTransfer.files).filter(
+        file => file.name.toLowerCase().endsWith('.docx')
+      );
+
+      if (files.length > 0) {
+        handleFiles(files);
+      } else {
+        showStatus("Solo se permiten archivos .docx", "error");
+      }
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files);
+      handleFiles(files);
+    });
+
+    // ============================================================
+    // MANEJO DE ARCHIVOS
+    // ============================================================
+    function handleFiles(files) {
+      selectedFiles = files;
+      displayFilePreview();
+      hideStatus();
+      hideStats();
+    }
+
+    function displayFilePreview() {
+      if (selectedFiles.length === 0) {
+        filePreview.classList.add("hidden");
+        return;
+      }
+
+      filePreview.classList.remove("hidden");
+      fileCount.textContent = selectedFiles.length;
+      fileList.innerHTML = "";
+
+      selectedFiles.forEach((file, index) => {
+        const fileItem = createFileItem(file, index);
+        fileList.appendChild(fileItem);
+      });
+    }
+
+    function createFileItem(file, index) {
+      const item = document.createElement("div");
+      item.className = "file-item";
+
+      const fileSize = formatFileSize(file.size);
+
+      item.innerHTML = `
+        <div class="file-info">
+          <span class="file-icon">📄</span>
+          <div class="file-details">
+            <span class="file-name">${escapeHtml(file.name)}</span>
+            <span class="file-size">${fileSize}</span>
+          </div>
+        </div>
+        <button type="button" class="btn-remove" data-index="${index}" title="Eliminar">
+          ✕
+        </button>
+      `;
+
+      const removeBtn = item.querySelector(".btn-remove");
+      removeBtn.addEventListener("click", () => removeFile(index));
+
+      return item;
+    }
+
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      displayFilePreview();
+
+      if (selectedFiles.length === 0) {
+        fileInput.value = "";
+      }
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ============================================================
+    // PROCESAMIENTO
+    // ============================================================
+    processBtn.addEventListener("click", async () => {
+      if (selectedFiles.length === 0) {
+        showStatus("Selecciona al menos un archivo .docx", "error");
+        return;
+      }
+
+      processBtn.disabled = true;
+      showProgress();
+      hideStatus();
+      hideStats();
+
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append("archivo", file));
+
+      try {
+        updateProgress(10, "Enviando archivos al servidor...");
+
+        const response = await fetch("/limpiar_cedula", {
+          method: "POST",
+          body: formData
+        });
+
+        updateProgress(50, "Procesando documentos...");
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Error al procesar los documentos");
+        }
+
+        updateProgress(80, "Preparando descarga...");
+
+        // Extraer estadísticas de los headers
+        const stats = extractStats(response.headers);
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+
+        const contentDisposition = response.headers.get("Content-Disposition");
+        const filename = contentDisposition
+          ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+          : "resultado.zip";
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        updateProgress(100, "¡Completado!");
+
+        setTimeout(() => {
+          hideProgress();
+          showStatus("✅ Descarga completada exitosamente", "success");
+          displayStats(stats);
+          resetForm();
+        }, 500);
+
+      } catch (error) {
+        hideProgress();
+        showStatus(`❌ ${error.message}`, "error");
+        processBtn.disabled = false;
+      }
+    });
+
+    // ============================================================
+    // UI HELPERS
+    // ============================================================
+    function showProgress() {
+      progressContainer.classList.remove("hidden");
+    }
+
+    function hideProgress() {
+      progressContainer.classList.add("hidden");
+    }
+
+    function updateProgress(percent, text) {
+      progressFill.style.width = `${percent}%`;
+      progressPercent.textContent = `${percent}%`;
+      progressText.textContent = text;
+    }
+
+    function showStatus(message, type) {
+      statusMessage.textContent = message;
+      statusMessage.className = `status-message status-${type}`;
+      statusMessage.classList.remove("hidden");
+    }
+
+    function hideStatus() {
+      statusMessage.classList.add("hidden");
+    }
+
+    function extractStats(headers) {
+      return {
+        imagesRemoved: parseInt(headers.get("X-CleanDoc-Images-Removed") || 0),
+        paragraphsCleaned: parseInt(headers.get("X-CleanDoc-Paragraphs-Cleaned") || 0),
+        signatureRemoved: headers.get("X-CleanDoc-Signature-Removed") === "True",
+        totalFiles: parseInt(headers.get("X-CleanDoc-Total-Files") || 1),
+        totalImages: parseInt(headers.get("X-CleanDoc-Total-Images-Removed") || 0),
+        totalParagraphs: parseInt(headers.get("X-CleanDoc-Total-Paragraphs-Cleaned") || 0)
+      };
+    }
+
+    function displayStats(stats) {
+      const hasMultipleFiles = stats.totalFiles > 1;
+
+      statsGrid.innerHTML = `
+        ${hasMultipleFiles ? `
+          <div class="stat-item">
+            <div class="stat-value">${stats.totalFiles}</div>
+            <div class="stat-label">Archivos procesados</div>
+          </div>
+        ` : ''}
+        <div class="stat-item">
+          <div class="stat-value">${hasMultipleFiles ? stats.totalImages : stats.imagesRemoved}</div>
+          <div class="stat-label">Imágenes eliminadas</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${hasMultipleFiles ? stats.totalParagraphs : stats.paragraphsCleaned}</div>
+          <div class="stat-label">Párrafos limpiados</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.signatureRemoved ? 'Sí' : 'N/A'}</div>
+          <div class="stat-label">Firmas eliminadas</div>
+        </div>
+      `;
+
+      statsContainer.classList.remove("hidden");
+    }
+
+    function hideStats() {
+      statsContainer.classList.add("hidden");
+    }
+
+    function resetForm() {
+      selectedFiles = [];
+      fileInput.value = "";
+      filePreview.classList.add("hidden");
+      processBtn.disabled = false;
+    }
+  </script>
+</body>
+</html>
