@@ -2,9 +2,14 @@
 venv/
 .env/
 .venv/
+env/
+
+# Variables de entorno
+.env
 
 # Archivos de logs
 *.log
+logs/
 cleandoc.log
 
 # Archivos del sistema
@@ -16,14 +21,23 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
 
 # Carpetas de ejemplo o pruebas
 ejemplos/
+test_files/
+uploads/
 
 # Archivos generados
 *.bak
 *.swp
 *.docx
+*.zip
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp
 
 # Archivos específicos
 CLAUDE.md
@@ -31,9 +45,24 @@ CLAUDE.md
 # Configuración de editores
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 
 # Distribución / builds
 dist/
 build/
 *.egg-info/
 
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
